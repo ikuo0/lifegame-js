@@ -36,37 +36,97 @@ function Random() {
 }
 var random = new Random();
 
-function LifeGame() {
+function Number2D() {
     var self = this;
-    self.width = 64;
-    self.height = 64;
-    self.setupMatrix = function() {
+    self.create = function(rows, cols) {
+        var res = [];
+        for(var i = 0; i < rows; i += 1) {
+            res.push(new Array(cols).fill(0));
+        }
+        return res;
+    }
+    self.clone = function(X) {
         var me = this;
-        var matrix = n2d.create(me.width, me.height);
-        for(var y = 0; y < me.height; y += 1) {
-            for(var x = 0; x < me.width; x += 1) {
+        var rows = X.length;
+        var cols = X[0].length;
+        var newMatrix = me.create(rows, cols);
+        for(var y = 0; y < rows; y += 1) {
+            for(var x = 0; x < cols; x += 1) {
+                newMatrix[y][x] = X[y][x];
+            }
+        }
+        return newMatrix;
+    }
+    self.rows = function(X) {
+        return X.length;
+    }
+    self.cols = function(X) {
+        return X[0].length;
+    }
+}
+var n2d = new Number2D();
+
+function LifeGameCore() {
+    var self = this;
+    self.initializeMatrix = function(height, width, matrix) {
+        var me = this;
+        for(var y = 0; y < height; y += 1) {
+            for(var x = 0; x < width; x += 1) {
                 matrix[y][x] = Math.random() < 0.4 ? 1 : 0;
             }
         }
     }
+    self.countAlives = function(height, width, yidx, xidx, X) {
+        var alive = 0;
+        for(var y = yidx - 1; y < yidx + 1; y += 1) {
+            if(y < 0 || y >= height) {
+                continue;
+            }
+            for(var x = xidx - 1; x < xidx + 1; x += 1) {
+                if(x < 0 || x >= width) {
+                    continue;
+                }
+                if(y == yidx && x == xidx) {
+                    continue;
+                }
+                alive += X[y][x];
+            }
+        }
+        return alive;
+    }
+    self.deadOrAlive = function(value, aliveCount) {
+        if(value == 0) {
+            if(aliveCount == 3) {
+                value = 1;
+            }
+        } else {
+            if(aliveCount == 2 || aliveCount == 3) {
+                value = 1;
+            } else if(aliveCount <= 1) {
+                value = 0;
+            } else if(aliveCount >= 4) {
+                value = 0;
+            }
+        }
+        return value;
+    }
     self.applyRulesToMatrix = function(matrix) {
         var me = this;
+        var rows = n2d.rows(matrix);
+        var cols = n2d.cols(matrix);
         var newMatrix = n2d.clone(matrix);
-        var ruleBirth = [0, function(a, d){return a == 3;}];
-        var ruleAlive = [1, function(a, d){return a == 2 || a == 3;}];
-        var ruleDead1 = [1, function(a, d){return a <= 1;}];
-        var ruleDead2 = [1, function(a, d){return a >= 4;}];
-        for(var y = 0; y < me.height; y += 1) {
-            for(var x = 0; x < me.width; x += 1) {
-                var deadOrAlive = me.checkRule(me.height, me.width, y, x, matrix, ruleBirth);
-                newMatrix[y][x] = deadOrAlive;
+        for(var y = 0; y < rows; y += 1) {
+            for(var x = 0; x < cols; x += 1) {
+                var aliveCount = me.countAlives(rows, cols, y, x, matrix);
+                var newValue = me.deadOrAlive(aliveCount, matrix[y][x]);
+                newMatrix[y][x] = newValue;
             }
         }
         return newMatrix;
     }
 }
 
-function GameMain() {
+function MoveTest() {
     var self = this;
     
     self.loadImage = function(pathName) {
@@ -141,6 +201,22 @@ function GameMain() {
     };
 }
 
+function LifeGameGame() {
+    var self = this;
+    var core = new LifeGameCore();
+    var X = n2d.create(64, 64);
+    core.initializeMatrix(n2d.rows(X), n2d.cols(X), X);
+    self.core = core;
+    self.X = X;
+    self.update = function() {
+        var me = this;
+        me.core.applyRulesToMatrix(me.X);
+    }
+    self.draw = function() {
+        
+    }
+}
+
 function Draw(ctx, x) {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     for(var i = 0; i < x.length; i += 1) {
@@ -198,7 +274,8 @@ function MainLoop() {
     }
 
     self.MainProcess = function() {
-        var g = new GameMain();
+        //var g = new MoveTest();
+        var g = new LifeGameGame();
         var t = performance.now();
         var fpst = t;
         var framen = 0;
