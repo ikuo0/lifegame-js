@@ -35,6 +35,7 @@ function Random() {
 	}
 }
 var random = new Random();
+random.seed((new Date()).getMilliseconds());
 
 function Number2D() {
     var self = this;
@@ -72,17 +73,17 @@ function LifeGameCore() {
         var me = this;
         for(var y = 0; y < height; y += 1) {
             for(var x = 0; x < width; x += 1) {
-                matrix[y][x] = Math.random() < 0.4 ? 1 : 0;
+                matrix[y][x] = random.rand() < 0.4 ? 1 : 0;
             }
         }
     }
     self.countAlives = function(height, width, yidx, xidx, X) {
         var alive = 0;
-        for(var y = yidx - 1; y < yidx + 1; y += 1) {
+        for(var y = yidx - 1; y < yidx + 2; y += 1) {
             if(y < 0 || y >= height) {
                 continue;
             }
-            for(var x = xidx - 1; x < xidx + 1; x += 1) {
+            for(var x = xidx - 1; x < xidx + 2; x += 1) {
                 if(x < 0 || x >= width) {
                     continue;
                 }
@@ -118,7 +119,7 @@ function LifeGameCore() {
         for(var y = 0; y < rows; y += 1) {
             for(var x = 0; x < cols; x += 1) {
                 var aliveCount = me.countAlives(rows, cols, y, x, matrix);
-                var newValue = me.deadOrAlive(aliveCount, matrix[y][x]);
+                var newValue = me.deadOrAlive(matrix[y][x], aliveCount);
                 newMatrix[y][x] = newValue;
             }
         }
@@ -204,16 +205,37 @@ function MoveTest() {
 function LifeGameGame() {
     var self = this;
     var core = new LifeGameCore();
-    var X = n2d.create(64, 64);
+    var X = n2d.create(128, 128);
     core.initializeMatrix(n2d.rows(X), n2d.cols(X), X);
     self.core = core;
     self.X = X;
+    self.tick = 0;
+    self.updateTick = 10;
     self.update = function() {
         var me = this;
-        me.core.applyRulesToMatrix(me.X);
+        if((me.tick % me.updateTick) == 0) {
+            me.X = me.core.applyRulesToMatrix(me.X);
+        }
+        me.tick += 1;
     }
-    self.draw = function() {
-        
+    self.drawData = function() {
+        var me = this;
+        var X = me.X;
+        var rows = n2d.rows(X);
+        var cols = n2d.cols(X);
+        var data = [];
+        for(var y = 0; y < rows; y += 1) {
+            for(var x = 0; x < cols; x += 1) {
+                var mx = x * 2;
+                var my = y * 2;
+                if(X[y][x]) {
+                    data.push([mx, my, 2, 2, "white"]);
+                } else {
+                    data.push([mx, my, 2, 2, "black"]);
+                }
+            }
+        }
+        return data;
     }
 }
 
@@ -223,6 +245,13 @@ function Draw(ctx, x) {
         var ix = x[i];
         ctx.drawImage(ix.img, 0, 0, ix.w, ix.h, ix.x - ix.w / 2, ix.y - ix.h / 2, ix.w, ix.h);
     }
+}
+
+function DrawLifeGame(ctx, data) {
+    data.forEach(function(z) {
+        ctx.fillStyle = z[4];
+        ctx.fillRect(z[0], z[1], z[2], z[3]);
+    });
 }
 
 function GameInput() {
@@ -294,7 +323,8 @@ function MainLoop() {
                 self.deviceToInput(gameInput, self.keyCodes, self.keyEvents);
                 self.keyCodes = [];
                 self.keyEvents = [];
-                g.main(gameInput);
+                //g.main(gameInput);
+                g.update();
                 framen += 1;
             }
             setTimeout(mainLoop);
@@ -302,7 +332,8 @@ function MainLoop() {
         var drawLoop = function() {
             var canvas = document.getElementById("main_canvas");
             var ctx = canvas.getContext("2d");
-            Draw(ctx, g.getDraw());
+            //Draw(ctx, g.drawData());
+            DrawLifeGame(ctx, g.drawData());
             ctx.font = '20px sans-serif';
             ctx.fillText(String(framerec) + "fps", 0, 32);
             requestAnimationFrame(drawLoop);
