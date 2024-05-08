@@ -67,6 +67,20 @@ function Number2D() {
 }
 var n2d = new Number2D();
 
+function Application() {
+    var self = this;
+    self.events = [];
+    self.pushEvent = function(eventName, eventData) {
+        var me = this;
+        me.events.push([eventName, eventData]);
+    }
+    self.popEvent = function() {
+        var me = this;
+        return me.events.pop();// nothing = undefined
+    }
+}
+var app = new Application();
+
 function LifeGameCore() {
     var self = this;
     self.initializeMatrix = function(height, width, matrix) {
@@ -202,18 +216,18 @@ function MoveTest() {
     };
 }
 
-function LifeGameGame() {
+function LifeGameGame(rowSize, colSize, updateFrame) {
     var self = this;
     var core = new LifeGameCore();
-    var X = n2d.create(128, 128);
+    var X = n2d.create(rowSize, colSize);
+    self.updateFrame = updateFrame;
     core.initializeMatrix(n2d.rows(X), n2d.cols(X), X);
     self.core = core;
     self.X = X;
     self.tick = 0;
-    self.updateTick = 10;
     self.update = function() {
         var me = this;
-        if((me.tick % me.updateTick) == 0) {
+        if((me.tick % me.updateFrame) == 0) {
             me.X = me.core.applyRulesToMatrix(me.X);
         }
         me.tick += 1;
@@ -265,6 +279,42 @@ function GameInput() {
     self.c = 0;
 }
 
+function AppSystem() {
+    var self = this;
+    self.configElements = function() {
+        return $("#select_size,#select_speed");
+    }
+    self.sizeSelectElement = function() {
+        return $("#select_size");
+    }
+    self.speedSelectElement = function() {
+        return $("#select_speed");
+    }
+    self.setupEvents = function() {
+        var me = this;
+        me.configElements().on("change", function() {
+            me.changeConfig();
+        });
+    }
+    self.getConfig = function() {
+        var me = this;
+        var size = parseInt(me.sizeSelectElement().val());
+        var speed = parseInt(me.speedSelectElement().val());
+        return {
+            size: size,
+            speed: speed
+        };
+    }
+    self.changeConfig = function() {
+        var me = this;
+        app.pushEvent("change-config", me.getConfig());
+    }
+    self.start = function() {
+        var me = this;
+        me.setupEvents();
+    }
+}
+
 function MainLoop() {
     var self = this;
     self.keyCodes = [];
@@ -280,7 +330,6 @@ function MainLoop() {
         self.keyCodes.push(e.code);
         self.keyEvents.push(0);
     }, false);
-    
     self.deviceToInput = function(gameInput, codes, events) {
         codes.forEach(function(code, i) {
             if(["ArrowLeft", "KeyA"].includes(code)) {
@@ -304,7 +353,7 @@ function MainLoop() {
 
     self.MainProcess = function() {
         //var g = new MoveTest();
-        var g = new LifeGameGame();
+        var g = new LifeGameGame(128, 128, 10);
         var t = performance.now();
         var fpst = t;
         var framen = 0;
@@ -327,11 +376,23 @@ function MainLoop() {
                 g.update();
                 framen += 1;
             }
+            while(1) {
+                var event = app.popEvent();
+                if(event === undefined) {
+                    break;
+                } else {
+                    var [eventName, eventData] = event;
+                    if(eventName == "change-config") {
+                        g = new LifeGameGame(eventData["size"], eventData["size"], eventData["speed"]);
+                    }
+                }
+            }
             setTimeout(mainLoop);
         }
         var drawLoop = function() {
             var canvas = document.getElementById("main_canvas");
             var ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             //Draw(ctx, g.drawData());
             DrawLifeGame(ctx, g.drawData());
             ctx.font = '20px sans-serif';
@@ -345,6 +406,8 @@ function MainLoop() {
 
 
 window.onload = function() {
-    var g = new MainLoop();
-    g.MainProcess();
+    var appSystem = new AppSystem();
+    var mainLoop = new MainLoop();
+    appSystem.start();
+    mainLoop.MainProcess();
 }
